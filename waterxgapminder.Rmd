@@ -1,0 +1,228 @@
+---
+title: "WaterXgapminder"
+author: "Vina"
+date: "16/05/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+water <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-05-04/water.csv')
+library(tidyverse)
+library(leaflet)
+library(dplyr)
+library(png)
+library(grid)
+```
+
+
+```{r, echo=FALSE}
+
+#remove NAs
+water <- water %>% drop_na()
+#install_year map 
+pal <- colorNumeric(palette = "GnBu", domain = water$install_year)
+ leaflet(data = water) %>% addTiles() %>% addCircleMarkers(lat = ~lat_deg, lng = ~lon_deg, popup = ~install_year, color = ~pal(install_year), stroke = FALSE, fillOpacity = 10) %>% addLegend(position = "bottomleft", pal = pal, values = ~install_year)
+```
+
+```{r, echo=FALSE}
+#load in gapminder dataset 
+ library(gapminder)
+ #match countries and year 
+ water$country_name <-  gapminder$country[match(water$country_name, gapminder$country)] 
+ water$install_year <-  gapminder$year[match(water$install_year, gapminder$year)] 
+water <- water %>% drop_na()
+#filter gapminder 
+watercountries <- water %>% count(country_name)
+gapminder2 <- gapminder %>% filter(country %in% c("Gambia", "Liberia","Sierra Leone", "Tanzania"))
+```
+
+```{r,echo=FALSE}
+#gdp map 
+tanzania_loc <- water %>% filter(country_name == "Tanzania") %>% mutate(avglat= mean(lat_deg),avglon = mean(lon_deg)) %>% filter(row_number()==1)
+gambia_loc <- water %>% filter(country_name == "Gambia") %>% mutate(avglat= mean(lat_deg),avglon = mean(lon_deg)) %>% filter(row_number()==1)
+SL_loc <- water %>% filter(country_name == "Sierra Leone") %>% mutate(avglat= mean(lat_deg),avglon = mean(lon_deg)) %>% filter(row_number()==1)
+liberia_loc<- water %>% filter(country_name == "Liberia") %>% mutate(avglat= mean(lat_deg),avglon = mean(lon_deg)) %>% filter(row_number()==1)
+combined_location <- rbind(tanzania_loc,gambia_loc,SL_loc,liberia_loc)
+
+tanzania_gap <- gapminder %>% filter(country == "Tanzania") %>% mutate(avglife= mean(lifeExp), avgpop= mean(pop), avggdp= mean(gdpPercap)) %>% filter(row_number()==1)
+gambia_gap <- gapminder %>% filter(country == "Gambia") %>% mutate(avglife= mean(lifeExp), avgpop= mean(pop), avggdp= mean(gdpPercap)) %>% filter(row_number()==1)
+SL_gap <- gapminder %>% filter(country == "Sierra Leone") %>% mutate(avglife= mean(lifeExp), avgpop= mean(pop), avggdp= mean(gdpPercap)) %>% filter(row_number()==1)
+liberia_gap <- gapminder %>% filter(country == "Liberia") %>% mutate(avglife= mean(lifeExp), avgpop= mean(pop), avggdp= mean(gdpPercap)) %>% filter(row_number()==1)
+combined_gap <- rbind(tanzania_gap,gambia_gap,SL_gap,liberia_gap)
+
+combined <- cbind(combined_gap,combined_location) 
+
+pal <- colorNumeric(palette = "Greens", domain = combined$avglife)
+leaflet(data = combined) %>% addTiles() %>% addCircleMarkers(lat = ~avglat, lng = ~avglon, popup = ~avglife, color = ~pal(avglife), stroke = FALSE, fillOpacity = 10) %>% addLegend(position = "bottomleft", pal = pal, values = ~avglife) 
+pal2 <- colorNumeric(palette = "BuPu", domain = combined$avggdp)
+ leaflet(data = combined) %>% addTiles() %>% addCircleMarkers(lat = ~avglat, lng = ~avglon, popup = ~avggdp, color = ~pal2(avggdp), stroke = FALSE, fillOpacity = 10) %>% addLegend(position = "bottomleft", pal = pal2, values = ~avggdp) 
+pal3 <- colorNumeric(palette = "OrRd", domain = combined$avgpop)
+ leaflet(data = combined) %>% addTiles() %>% addCircleMarkers(lat = ~avglat, lng = ~avglon, popup = ~avgpop, color = ~pal3(avgpop), stroke = FALSE, fillOpacity = 10) %>% addLegend(position = "bottomleft", pal = pal3, values = ~avgpop) 
+```
+
+Let's try something new: visualize and explore data through spherical mathematical equations! yay!
+
+Building our plot layout (comprised of two overlapping spheres to create a "wire" sphere: 
+
+```{r, echo=FALSE}
+library(rgl)
+mfrow3d(nr = 5, nc = 1)
+for(i in 1:3){
+         spheres3d(0,0,0,radius= 6.9, lit=FALSE,color="white")
+ spheres3d(0,0,0,radius=7,lit=FALSE,color="black",front="lines") 
+}
+rglwidget(height = 2000, width = 1000)
+```
+
+PLotting some actual data on our layout: 
+```{r, echo=FALSE}
+
+ #create plot points by converting lat and lon info into spherical coordinates
+set.seed(101)
+ x4 <-6.9*cos(water$lat_deg)*cos(water$lon_deg)
+ y4 <- 6.9*cos(water$lat_deg)*sin(water$lon_deg)
+ z4 <- 6.9*sin(water$lat_deg)
+  mfrow3d(nr = 5, nc = 1)
+for(i in 1:3){
+         spheres3d(0,0,0,radius= 6.9, lit=FALSE,color="white")
+ spheres3d(0,0,0,radius=7,lit=FALSE,color="black",front="lines") 
+     spheres3d(x4,y4,z4,col="blue")
+}
+rglwidget(height = 2000, width = 1000)
+```
+
+Important note: These spherical plots do not depict interaction of any kind. Think of them as just a way to "overlay" multiple plots within a 3d space. At most, they represent the trend/linearity of the data (more clustered data points along an axis =more linear). 
+
+Notice with the location sphere that we just created that most data points are clustered together. This is because most  latitude and longitude information are similar to each other (recall leaflet map from earlier where there was a huge cluster around Tanzania)
+
+Let's try one with just the gapminder dataset and notice again how the data points exists along an axis. In this case, an interaction effect could be hypothesized because all data points come from the same dataset+have year as a constant variable.
+
+```{r, echo=FALSE}
+ set.seed(101)
+ x <-6.9*cos(gapminder2$year)*cos(gapminder2$lifeExp)
+ y <- 6.9*cos(gapminder2$year)*sin(gapminder2$lifeExp)
+ z <- 6.9*sin(gapminder2$year)
+ x2 <- 6.9*cos(gapminder2$year)*cos(gapminder2$gdpPercap)
+ y2<- 6.9*cos(gapminder2$year)*sin(gapminder2$gdpPercap)
+ z2 <- 6.9* sin(gapminder2$year)
+ x3 <- 6.9*cos(gapminder2$year)*cos(gapminder2$pop)
+ y3<- 6.9*cos(gapminder2$year)*sin(gapminder2$pop)
+ z3 <- 6.9* sin(gapminder2$year)
+ mfrow3d(nr = 5, nc = 1)
+for(i in 1:3){
+         spheres3d(0,0,0,radius= 6.9, lit=FALSE,color="white")
+ spheres3d(0,0,0,radius=7,lit=FALSE,color="black",front="lines") 
+     spheres3d(x,y,z,col="red")
+ spheres3d(x2,y2,z2,col="blue")
+ spheres3d(x3,y3,z3,col="green")
+}
+rglwidget(height = 2000, width = 1000)
+ 
+```
+
+
+ Depiction of cartesian coordinates as a data frame: 
+ 
+```{r,echo=FALSE}
+ #depiction of cartesian coordinates as a data frame: 
+ x <- 6.9*cos(gapminder2$year)*cos(gapminder2$gdpPercap)
+ y <- 6.9*cos(gapminder2$year)*sin(gapminder2$gdpPercap)
+ z <- 6.9* sin(gapminder2$year)
+ cord<- rbind(x,y,z)
+ head(cord)
+```
+ 
+
+ 
+Let's include water data now
+
+Water X gdp
+
+```{r,echo=FALSE}
+ test<- water %>% count(install_year)
+ 
+ set.seed(101)
+ a <- 6.9*cos(test$install_year)*cos(test$n)
+ b<- 6.9*cos(test$install_year)*sin(test$n)
+ c <- 6.9* sin(test$install_year)
+ a2 <- 6.9*cos(gapminder2$year)*cos(gapminder2$gdpPercap)
+ b2<- 6.9*cos(gapminder2$year)*sin(gapminder2$gdpPercap)
+ c2 <- 6.9* sin(gapminder2$year)
+  mfrow3d(nr = 5, nc = 1)
+for(i in 1:3){
+         spheres3d(0,0,0,radius= 6.9, lit=FALSE,color="white")
+ spheres3d(0,0,0,radius=7,lit=FALSE,color="black",front="lines") 
+     spheres3d(a,b,c,col="blue")
+ spheres3d(a2,b2,c2,col="yellow")
+}
+rglwidget(height = 2000, width = 1000)
+```
+ 
+ Water X population
+ 
+```{r,echo=FALSE}
+ set.seed(101)
+ h <- 6.9*cos(test$install_year)*cos(test$n)
+ i<- 6.9*cos(test$install_year)*sin(test$n)
+ j <- 6.9* sin(test$install_year)
+ h2 <- 6.9*cos(gapminder2$year)*cos(gapminder2$pop)
+ i2<- 6.9*cos(gapminder2$year)*sin(gapminder2$pop)
+ j2 <- 6.9* sin(gapminder2$year)
+ mfrow3d(nr = 5, nc = 1)
+for(i in 1:3){
+         spheres3d(0,0,0,radius= 6.9, lit=FALSE,color="white")
+ spheres3d(0,0,0,radius=7,lit=FALSE,color="black",front="lines") 
+     spheres3d(h,i,j,col="blue")
+ spheres3d(h2,i2,j2,col="pink")
+}
+rglwidget(height = 2000, width = 1000)
+```
+ 
+ 
+Water X life expectancy
+ 
+```{r,echo=FALSE}
+ 
+ set.seed(101)
+ l <- 6.9*cos(test$install_year)*cos(test$n)
+ m<- 6.9*cos(test$install_year)*sin(test$n)
+ n <- 6.9* sin(test$install_year)
+ l2 <- 6.9*cos(gapminder2$year)*cos(gapminder2$lifeExp)
+ m2<- 6.9*cos(gapminder2$year)*sin(gapminder2$lifeExp)
+ n2 <- 6.9* sin(gapminder2$year)
+ mfrow3d(nr = 5, nc = 1)
+for(i in 1:3){
+         spheres3d(0,0,0,radius= 6.9, lit=FALSE,color="white")
+ spheres3d(0,0,0,radius=7,lit=FALSE,color="black",front="lines") 
+     spheres3d(l,m,n,col="blue")
+ spheres3d(l2,m2,n2,col="violet")
+}
+rglwidget(height = 2000, width = 1000)
+
+```
+ 
+ 
+ Regular plots to check if our sphere plots are representative :-)
+ 
+ 
+```{r,echo=FALSE}
+
+ggplot(gapminder2, aes(year, gdpPercap, colour=country)) + geom_smooth()
+ggplot(gapminder2, aes(year, lifeExp, colour=country)) + geom_smooth()
+ggplot(gapminder2, aes(year, pop, colour=country)) + geom_smooth()
+ggplot(water, aes(install_year)) +geom_bar()
+
+ 
+#overlay plots 
+year <- water %>% count(install_year)
+
+year %>% ggplot(aes(install_year,n)) +
+stat_summary(fun=mean, geom = "line", linetype = 2) +
+stat_summary(aes(year,gdpPercap), gapminder2, fun = mean, geom = "line", colour = "red") +
+stat_summary(aes(year,lifeExp), gapminder2, fun = mean, geom = "line", colour = "green") + 
+scale_y_continuous(labels = scales::comma) 
+
+```
+ 
+ 
